@@ -15,7 +15,7 @@ KegiatanKu adalah aplikasi desktop berbasis GUI yang dikembangkan menggunakan Py
 - Menyimpan data menggunakan SQLite
 - Mengekspor data kegiatan ke file CSV dan PDF
 - Tampilan yang dirancang manual dengan PyQt5
-- Menu bar dan status bar sesuai ketentuan tugas
+- Menu bar dan status bar 
 
 ## 🛠️ Teknologi
 - Python 3.10
