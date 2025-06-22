@@ -13,7 +13,7 @@ KegiatanKu adalah aplikasi desktop berbasis GUI yang dikembangkan menggunakan Py
 - Input tanggal dengan QDateEdit (kalender)
 - input status menggunakan QComboBox (drodpdown)
 - Menyimpan data menggunakan SQLite
-- Mengekspor data kegiatan ke file CSV
+- Mengekspor data kegiatan ke file CSV dan PDF
 - Tampilan yang dirancang manual dengan PyQt5
 - Menu bar dan status bar sesuai ketentuan tugas
 
