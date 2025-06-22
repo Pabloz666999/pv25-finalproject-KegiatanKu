@@ -4,7 +4,7 @@ import csv
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QLineEdit, QTextEdit,
     QPushButton, QVBoxLayout, QGridLayout, QTableWidget, QTableWidgetItem,
-    QDateEdit, QAction, QFileDialog, QMessageBox, QStatusBar, QHBoxLayout, QComboBox
+    QDateEdit, QAction, QFileDialog, QMessageBox, QStatusBar, QHBoxLayout, QComboBox, QHeaderView
 )
 from PyQt5.QtCore import QDate
 
@@ -37,11 +37,19 @@ class KegiatanKu(QMainWindow):
     def initUI(self):
         menubar = self.menuBar()
         fileMenu = menubar.addMenu("File")
-        helpMenu = menubar.addMenu("Help")
+        export_csv_action = QAction("Export ke CSV", self)
+        export_csv_action.triggered.connect(self.export_csv)
+        fileMenu.addAction(export_csv_action)
+
+        export_pdf_action = QAction("Export ke PDF", self)
+        export_pdf_action.triggered.connect(self.export_pdf)
+        fileMenu.addAction(export_pdf_action)
 
         exitAction = QAction("Exit", self)
         exitAction.triggered.connect(self.close)
         fileMenu.addAction(exitAction)
+
+        helpMenu = menubar.addMenu("Help")
 
         aboutAction = QAction("About", self)
         aboutAction.triggered.connect(lambda: QMessageBox.information(
@@ -67,7 +75,9 @@ class KegiatanKu(QMainWindow):
         self.input_tanggal = QDateEdit()
         self.input_tanggal.setDisplayFormat("yyyy-MM-dd")
         self.input_tanggal.setCalendarPopup(True)
-        self.input_tanggal.setDate(QDate.currentDate())
+        self.input_tanggal.setDate(QDate())  
+        self.input_tanggal.clear()           
+
 
         form_layout.addWidget(QLabel("Judul Kegiatan:"), 0, 0)
         form_layout.addWidget(self.input_judul, 0, 1)
@@ -96,18 +106,16 @@ class KegiatanKu(QMainWindow):
         self.delete_btn.clicked.connect(self.hapus_kegiatan)
         button_layout.addWidget(self.delete_btn)
 
-        self.export_btn = QPushButton("Export CSV")
-        self.export_btn.clicked.connect(self.export_csv)
-        button_layout.addWidget(self.export_btn)
-
         layout.addLayout(button_layout)
 
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Judul", "Lokasi", "Tanggal", "Status", "Catatan"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.cellClicked.connect(self.barisklik)
         layout.addWidget(self.table)
+
 
         central_widget.setLayout(layout)
         self.load_data()
@@ -161,13 +169,14 @@ class KegiatanKu(QMainWindow):
     def simpan_kegiatan(self):
         judul = self.input_judul.text()
         lokasi = self.input_lokasi.text()
-        tanggal = self.input_tanggal.text()
         status = self.input_status.currentText()
         catatan = self.input_catatan.toPlainText()
 
-        if not judul:
-            QMessageBox.warning(self, "Peringatan", "Judul tidak boleh kosong.")
+        if not judul or not self.input_tanggal.date().isValid():
+            QMessageBox.warning(self, "Peringatan", "Judul dan Tanggal tidak boleh kosong.")
             return
+
+        tanggal = self.input_tanggal.date().toString("yyyy-MM-dd")
 
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
@@ -177,6 +186,7 @@ class KegiatanKu(QMainWindow):
         conn.close()
         self.load_data()
         self.clear_form()
+
     def barisklik(self, row):
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
@@ -208,8 +218,8 @@ class KegiatanKu(QMainWindow):
         ''', (
             self.input_judul.text(),
             self.input_lokasi.text(),
-            self.input_tanggal.date().toString(),
-            self.input_status.text(),
+            self.input_tanggal.date().toString("yyyy-MM-dd"),
+            self.input_status.currentText(), 
             self.input_catatan.toPlainText(),
             self.selected_row_id
         ))
@@ -217,6 +227,7 @@ class KegiatanKu(QMainWindow):
         conn.close()
         self.load_data()
         self.clear_form()
+
 
     def hapus_kegiatan(self):
         if self.selected_row_id is None:
@@ -258,10 +269,51 @@ class KegiatanKu(QMainWindow):
                 writer.writerows(data)
             QMessageBox.information(self, "Berhasil", "Data berhasil diexport ke CSV.")
 
+
+    def export_pdf(self):
+        from fpdf import FPDF
+
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        cursor.execute("SELECT judul, lokasi, tanggal, status, catatan FROM kegiatan")
+        data = cursor.fetchall()
+        conn.close()
+
+        if not data:
+            QMessageBox.warning(self, "Kosong", "Tidak ada data untuk diexport.")
+            return
+
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(0, 10, "Daftar Kegiatan - KegiatanKu", ln=True, align='C')
+        pdf.set_font("Arial", 'B', 10)
+        pdf.ln(5)
+        pdf.cell(40, 10, "Judul", 1)
+        pdf.cell(35, 10, "Lokasi", 1)
+        pdf.cell(30, 10, "Tanggal", 1)
+        pdf.cell(35, 10, "Status", 1)
+        pdf.cell(50, 10, "Catatan", 1)
+        pdf.ln()
+
+        pdf.set_font("Arial", '', 10)
+        for row in data:
+            pdf.cell(40, 10, str(row[0])[:20], 1)
+            pdf.cell(35, 10, str(row[1])[:20], 1)
+            pdf.cell(30, 10, str(row[2]), 1)
+            pdf.cell(35, 10, str(row[3])[:20], 1)
+            pdf.cell(50, 10, str(row[4])[:30], 1)
+            pdf.ln()
+
+        path, _ = QFileDialog.getSaveFileName(self, "Simpan PDF", "", "PDF Files (*.pdf)")
+        if path:
+            pdf.output(path)
+            QMessageBox.information(self, "Berhasil", "Data berhasil diexport ke PDF.")
+
     def clear_form(self):
         self.input_judul.clear()
         self.input_lokasi.clear()
-        self.input_tanggal.setDate(QDate.currentDate())
+        self.input_tanggal.setDate(QDate())  
         self.input_status.setCurrentIndex(0)
         self.input_catatan.clear()
         self.selected_row_id = None
